@@ -1,4 +1,4 @@
-name: Compilar L4D2 (SteamWorks Fix V2)
+name: Compilar L4D2 (Bypass Git Errors)
 
 on: [push, workflow_dispatch]
 
@@ -13,24 +13,24 @@ jobs:
       - name: 1. Instalar dependencias
         run: |
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip build-essential gcc-multilib g++-multilib clang
+          DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip build-essential gcc-multilib g++-multilib clang wget unzip
 
       - name: 2. Instalar AMBuild
         run: |
           pip3 install wheel
           pip3 install git+https://github.com/alliedmodders/ambuild
 
-      # --- DESCARGAS ---
+      # --- DESCARGAS LIMPIAS ---
       - name: 3. Descargar Tu Codigo
         uses: actions/checkout@v4
         with:
           path: sourcetvsupport
 
-      - name: 4. Descargar SourceMod
+      - name: 4. Descargar SourceMod (Rama Estable)
         uses: actions/checkout@v4
         with:
           repository: alliedmodders/sourcemod
-          ref: 1.12-dev
+          ref: master
           path: sourcemod
           submodules: true
 
@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: alliedmodders/metamod-source
-          ref: 1.12-dev
+          ref: master
           path: mmsource
 
       - name: 6. Descargar HL2SDK (L4D2)
@@ -48,16 +48,18 @@ jobs:
           ref: l4d2
           path: hl2sdk-l4d2
 
-      # USAMOS EL REPO DE ALLIEDMODDERS (No requiere token y es estable)
-      - name: 7. Descargar SteamWorks SDK (AlliedModders)
-        uses: actions/checkout@v4
-        with:
-          repository: alliedmodders/hl2sdk
-          ref: sdk-2013
-          path: steamworks-sdk
+      # DESCARGA MANUAL DEL STEAMWORKS SDK PARA EVITAR FALLOS DE GIT
+      - name: 7. Descargar SteamWorks SDK (Manual)
+        run: |
+          mkdir -p steamworks-sdk
+          cd steamworks-sdk
+          wget https://github.com/alliedmodders/hl2sdk/archive/refs/heads/sdk-2013.zip -O sdk.zip
+          unzip sdk.zip
+          mv hl2sdk-sdk-2013/* .
+          rm -rf hl2sdk-sdk-2013 sdk.zip
 
       # --- COMPILACIÓN ---
-      - name: 8. Compilar (Ruta Final)
+      - name: 8. Compilar
         working-directory: sourcetvsupport
         env:
           SOURCEMOD: ${{ github.workspace }}/sourcemod
@@ -68,7 +70,6 @@ jobs:
           mkdir -p build
           cd build
           
-          # Configuramos el build
           python3 ../configure.py \
             --enable-optimize \
             --sdks=l4d2 \
