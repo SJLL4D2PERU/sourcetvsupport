@@ -1,0 +1,57 @@
+name: Compilar para L4D2 (Fix GLIBC)
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    # ESTA ES LA CLAVE: Usamos Ubuntu 20.04 para tener una GLIBC antigua
+    # compatible con servidores Debian/Ubuntu clásicos.
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Instalar dependencias 32-bits
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y g++-multilib git python3 python3-pip
+          pip3 install ambuild
+
+      - name: Preparar carpetas
+        run: mkdir -p build-env
+
+      - name: Descargar SourceTV Support (Tu repo)
+        uses: actions/checkout@v3
+        with:
+          path: build-env/sourcetvsupport
+
+      - name: Descargar HL2SDK L4D2
+        uses: actions/checkout@v3
+        with:
+          repository: alliedmodders/hl2sdk-l4d2
+          path: build-env/hl2sdk-l4d2
+
+      - name: Descargar SourceMod
+        uses: actions/checkout@v3
+        with:
+          repository: alliedmodders/sourcemod
+          path: build-env/sourcemod
+
+      - name: Descargar MetaMod
+        uses: actions/checkout@v3
+        with:
+          repository: alliedmodders/mmsource-1.11
+          path: build-env/mmsource
+
+      - name: Compilar Extensión
+        working-directory: build-env/sourcetvsupport
+        run: |
+          mkdir build
+          cd build
+          python3 ../configure.py --enable-optimize --sdks=l4d2 --targets=x86
+          ambuild
+
+      - name: Subir archivo .SO final
+        uses: actions/upload-artifact@v3
+        with:
+          name: sourcetvsupport-fixed-glibc
+          path: build-env/sourcetvsupport/build/package/**/*.so
