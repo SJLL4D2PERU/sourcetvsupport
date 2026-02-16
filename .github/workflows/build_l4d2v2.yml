@@ -1,4 +1,4 @@
-name: Compilar L4D2 (Fix SourceMod)
+name: Compilar L4D2 (Forced Paths)
 
 on: [push, workflow_dispatch]
 
@@ -13,18 +13,18 @@ jobs:
       - name: 1. Instalar dependencias
         run: |
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip build-essential gcc-multilib g++-multilib clang tree
+          DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip build-essential gcc-multilib g++-multilib clang
 
       - name: 2. Instalar AMBuild
         run: |
           pip3 install wheel
           pip3 install git+https://github.com/alliedmodders/ambuild
 
-      # --- DESCARGAS ---
+      # --- DESCARGAS EN LA RAÍZ ---
       - name: 3. Descargar Tu Codigo
         uses: actions/checkout@v4
         with:
-          path: src
+          path: sourcetvsupport
 
       - name: 4. Descargar SourceMod
         uses: actions/checkout@v4
@@ -32,6 +32,7 @@ jobs:
           repository: alliedmodders/sourcemod
           ref: 1.12-dev
           path: sourcemod
+          submodules: true # Importante para que no falten archivos internos
 
       - name: 5. Descargar MetaMod
         uses: actions/checkout@v4
@@ -48,49 +49,31 @@ jobs:
           path: hl2sdk-l4d2
 
       # --- COMPILACIÓN ---
-      - name: 7. Compilar (Variables Totales)
-        working-directory: src
-        # AQUÍ ESTÁ EL FIX: Agregamos TODAS las variantes de nombres posibles para SourceMod
+      - name: 7. Compilar (Path Injection)
+        working-directory: sourcetvsupport
         env:
-          # HL2SDK (Ya funcionó)
-          HL2SDKL4D2: ${{ github.workspace }}/hl2sdk-l4d2
-          HL2SDK_L4D2: ${{ github.workspace }}/hl2sdk-l4d2
-          
-          # MMSOURCE
-          MMSOURCE112: ${{ github.workspace }}/mmsource
-          MMSOURCE: ${{ github.workspace }}/mmsource
-          
-          # SOURCEMOD (El que fallaba)
-          SOURCEMOD112: ${{ github.workspace }}/sourcemod
+          # Inyectamos las variables directamente al entorno de Python
           SOURCEMOD: ${{ github.workspace }}/sourcemod
-          SOURCEMOD_PATH: ${{ github.workspace }}/sourcemod
-          SM_PATH: ${{ github.workspace }}/sourcemod
-          
-          CC: clang
-          CXX: clang++
+          HL2SDKL4D2: ${{ github.workspace }}/hl2sdk-l4d2
+          MMSOURCE112: ${{ github.workspace }}/mmsource
         run: |
-          echo "=== VERIFICANDO RUTAS (DEBUG) ==="
-          ls -ld $HL2SDKL4D2
-          ls -ld $MMSOURCE
-          ls -ld $SOURCEMOD
-          echo "================================="
-          
           mkdir -p build
           cd build
           
-          # Ejecutamos configure.py
+          # Forzamos la configuración usando rutas relativas directas (../..)
+          # para que AMBuild no tenga que adivinar nada.
           python3 ../configure.py \
             --enable-optimize \
             --sdks=l4d2 \
             --targets=x86 \
-            --sm-path="${{ github.workspace }}/sourcemod" \
-            --mms-path="${{ github.workspace }}/mmsource"
+            --sm-path="../../sourcemod" \
+            --mms-path="../../mmsource" \
+            --hl2sdk-root="../../"
 
-          # Compilamos
           ambuild
 
       - name: 8. Subir archivo .SO
         uses: actions/upload-artifact@v4
         with:
           name: sourcetvsupport-l4d2-linux-fixed
-          path: src/build/package/**/*.so
+          path: sourcetvsupport/build/package/**/*.so
