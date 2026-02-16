@@ -1,0 +1,58 @@
+name: Compilar SourceTV (Fix GLIBC Container)
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    # Usamos la máquina más rápida de GitHub...
+    runs-on: ubuntu-latest
+    # ...pero forzamos que trabaje DENTRO de un Linux antiguo (Ubuntu 20.04)
+    # Esto es lo que arregla el error de GLIBC en tu servidor.
+    container:
+      image: ubuntu:20.04
+
+    steps:
+      - name: 1. Instalar herramientas de compilación (32-bits)
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip build-essential gcc-multilib g++-multilib clang
+
+      - name: 2. Instalar AMBuild
+        run: pip3 install ambuild
+
+      # Clonamos todo en una estructura plana para que se encuentren entre sí
+      - name: 3. Descargar SourceTV Support (Tu código)
+        uses: actions/checkout@v4
+        with:
+          path: sourcetvsupport
+
+      - name: 4. Descargar HL2SDK L4D2
+        uses: actions/checkout@v4
+        with:
+          repository: alliedmodders/hl2sdk-l4d2
+          path: hl2sdk-l4d2
+
+      - name: 5. Descargar SourceMod
+        uses: actions/checkout@v4
+        with:
+          repository: alliedmodders/sourcemod
+          path: sourcemod
+
+      - name: 6. Descargar MetaMod
+        uses: actions/checkout@v4
+        with:
+          repository: alliedmodders/mmsource-1.11
+          path: mmsource
+
+      - name: 7. Compilar Extensión
+        run: |
+          cd sourcetvsupport
+          mkdir -p build
+          python3 configure.py --enable-optimize --sdks=l4d2 --targets=x86 --mms-path=../mmsource --sm-path=../sourcemod --hlsdk=../hl2sdk-l4d2
+          ambuild
+
+      - name: 8. Subir archivo generado
+        uses: actions/upload-artifact@v4
+        with:
+          name: sourcetvsupport-fixed
+          path: sourcetvsupport/build/package/**/*.so
