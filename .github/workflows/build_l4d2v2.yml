@@ -1,4 +1,4 @@
-name: Compilar L4D2 (Nuclear Fix)
+name: Compilar L4D2 (Fix SourceMod)
 
 on: [push, workflow_dispatch]
 
@@ -20,7 +20,7 @@ jobs:
           pip3 install wheel
           pip3 install git+https://github.com/alliedmodders/ambuild
 
-      # --- DESCARGAS (CHECKOUTS) ---
+      # --- DESCARGAS ---
       - name: 3. Descargar Tu Codigo
         uses: actions/checkout@v4
         with:
@@ -48,28 +48,37 @@ jobs:
           path: hl2sdk-l4d2
 
       # --- COMPILACIÓN ---
-      - name: 7. Compilar (Con Variables Forzadas)
+      - name: 7. Compilar (Variables Totales)
         working-directory: src
-        # AQUÍ ESTÁ EL CAMBIO CLAVE:
-        # Definimos las variables en el entorno del paso, no en el comando.
+        # AQUÍ ESTÁ EL FIX: Agregamos TODAS las variantes de nombres posibles para SourceMod
         env:
+          # HL2SDK (Ya funcionó)
           HL2SDKL4D2: ${{ github.workspace }}/hl2sdk-l4d2
           HL2SDK_L4D2: ${{ github.workspace }}/hl2sdk-l4d2
+          
+          # MMSOURCE
           MMSOURCE112: ${{ github.workspace }}/mmsource
+          MMSOURCE: ${{ github.workspace }}/mmsource
+          
+          # SOURCEMOD (El que fallaba)
           SOURCEMOD112: ${{ github.workspace }}/sourcemod
+          SOURCEMOD: ${{ github.workspace }}/sourcemod
+          SOURCEMOD_PATH: ${{ github.workspace }}/sourcemod
+          SM_PATH: ${{ github.workspace }}/sourcemod
+          
           CC: clang
           CXX: clang++
         run: |
-          # Debug: Mostrar que las carpetas existen realmente
-          echo "Verificando rutas..."
+          echo "=== VERIFICANDO RUTAS (DEBUG) ==="
           ls -ld $HL2SDKL4D2
-          ls -ld $MMSOURCE112
+          ls -ld $MMSOURCE
+          ls -ld $SOURCEMOD
+          echo "================================="
           
           mkdir -p build
           cd build
           
           # Ejecutamos configure.py
-          # Ya no le pasamos paths raros, confiamos en las variables ENV de arriba
           python3 ../configure.py \
             --enable-optimize \
             --sdks=l4d2 \
