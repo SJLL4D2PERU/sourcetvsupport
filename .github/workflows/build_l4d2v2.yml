@@ -1,4 +1,4 @@
-name: Compilar L4D2 Fix (Argumentos Corregidos)
+name: Compilar L4D2 Final (Env Vars)
 
 on: [push, workflow_dispatch]
 
@@ -20,7 +20,7 @@ jobs:
           pip3 install wheel
           pip3 install git+https://github.com/alliedmodders/ambuild
 
-      - name: 3. Descargar Tu Codigo (SourceTV Support)
+      - name: 3. Descargar Tu Codigo
         uses: actions/checkout@v4
         with:
           path: src
@@ -46,24 +46,27 @@ jobs:
           ref: l4d2
           path: hl2sdk-l4d2
 
-      - name: 7. Compilar (Comando Corregido)
+      - name: 7. Compilar (Con Variables de Entorno)
         working-directory: src
         run: |
           mkdir -p build
           cd build
           
-          # CORRECCIÓN AQUÍ:
-          # Usamos --hl2sdk-root apuntando a la carpeta raíz del workspace
-          # El script buscará automáticamente la carpeta "hl2sdk-l4d2" ahí dentro.
+          # === LA SOLUCIÓN ===
+          # Definimos manualmente dónde está cada cosa usando variables de entorno.
+          # Esto evita que AMBuild tenga que "adivinar" y fallar.
+          export HL2SDKL4D2="${{ github.workspace }}/hl2sdk-l4d2"
+          export MMSOURCE112="${{ github.workspace }}/mmsource"
           
+          # Ejecutamos configure.py pasándole también las rutas por si acaso
           python3 ../configure.py \
             --enable-optimize \
             --sdks=l4d2 \
             --targets=x86 \
             --sm-path="${{ github.workspace }}/sourcemod" \
-            --mms-path="${{ github.workspace }}/mmsource" \
-            --hl2sdk-root="${{ github.workspace }}"
+            --mms-path="${{ github.workspace }}/mmsource"
 
+          # Compilamos
           ambuild
 
       - name: 8. Subir archivo .SO
