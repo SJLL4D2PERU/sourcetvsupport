@@ -22,7 +22,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - ubuntu-22.04
+          - ubuntu-20.40
           - windows-latest
           
         sm_version:
