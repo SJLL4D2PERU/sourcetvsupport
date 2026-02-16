@@ -1,19 +1,16 @@
-name: Compilar L4D2 Linux (Fix GLIBC)
+name: Compilar L4D2 Fix (Argumentos Corregidos)
 
 on: [push, workflow_dispatch]
 
 jobs:
   build:
-    name: Compilar en Ubuntu 20.04 (Legacy)
-    # Usamos la máquina rápida...
+    name: Compilar Ubuntu 20.04
     runs-on: ubuntu-latest
-    # ...pero la encerramos en una jaula de Linux Viejo (20.04)
-    # Esto soluciona tu error: /lib/i386-linux-gnu/libc.so.6: version `GLIBC_2.38' not found
     container:
       image: ubuntu:20.04
 
     steps:
-      - name: 1. Instalar dependencias básicas (Root)
+      - name: 1. Instalar dependencias
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip build-essential gcc-multilib g++-multilib clang
@@ -28,14 +25,14 @@ jobs:
         with:
           path: src
 
-      - name: 4. Descargar SourceMod (1.12)
+      - name: 4. Descargar SourceMod
         uses: actions/checkout@v4
         with:
           repository: alliedmodders/sourcemod
           ref: 1.12-dev
           path: sourcemod
 
-      - name: 5. Descargar MetaMod (1.12)
+      - name: 5. Descargar MetaMod
         uses: actions/checkout@v4
         with:
           repository: alliedmodders/metamod-source
@@ -49,24 +46,27 @@ jobs:
           ref: l4d2
           path: hl2sdk-l4d2
 
-      - name: 7. Compilar
+      - name: 7. Compilar (Comando Corregido)
         working-directory: src
         run: |
           mkdir -p build
           cd build
-          # NOTA: He quitado --swsdk-path porque requiere contraseña privada.
-          # Usualmente hl2sdk-l4d2 es suficiente.
+          
+          # CORRECCIÓN AQUÍ:
+          # Usamos --hl2sdk-root apuntando a la carpeta raíz del workspace
+          # El script buscará automáticamente la carpeta "hl2sdk-l4d2" ahí dentro.
+          
           python3 ../configure.py \
             --enable-optimize \
             --sdks=l4d2 \
             --targets=x86 \
             --sm-path="${{ github.workspace }}/sourcemod" \
             --mms-path="${{ github.workspace }}/mmsource" \
-            --hlsdk="${{ github.workspace }}/hl2sdk-l4d2"
-          
+            --hl2sdk-root="${{ github.workspace }}"
+
           ambuild
 
-      - name: 8. Subir el archivo .SO
+      - name: 8. Subir archivo .SO
         uses: actions/upload-artifact@v4
         with:
           name: sourcetvsupport-l4d2-linux-fixed
