@@ -1,4 +1,4 @@
-name: Compilar L4D2 (SteamWorks Kyle Fix)
+name: Compilar L4D2 (SteamWorks Header Fix)
 
 on: [push, workflow_dispatch]
 
@@ -20,8 +20,7 @@ jobs:
           pip3 install wheel
           pip3 install git+https://github.com/alliedmodders/ambuild
 
-      # --- DESCARGAS ---
-      - name: 3. Descargar Tu Codigo (SourceTV Support)
+      - name: 3. Descargar Tu Codigo
         uses: actions/checkout@v4
         with:
           path: sourcetvsupport
@@ -48,16 +47,14 @@ jobs:
           ref: l4d2
           path: hl2sdk-l4d2
 
-      # USAMOS EL REPO QUE ENCONTRASTE (KyleSanderson)
-      - name: 7. Descargar SteamWorks SDK (KyleSanderson)
+      - name: 7. Descargar SteamWorks SDK (Kyle)
         uses: actions/checkout@v4
         with:
           repository: KyleSanderson/SteamWorks
           ref: master
           path: steamworks-sdk
 
-      # --- COMPILACIÓN ---
-      - name: 8. Compilar
+      - name: 8. Compilar (Fix Include Paths)
         working-directory: sourcetvsupport
         env:
           SOURCEMOD: ${{ github.workspace }}/sourcemod
@@ -68,8 +65,8 @@ jobs:
           mkdir -p build
           cd build
           
-          # Configuramos el build
-          # Nota: Algunos scripts esperan que steamworks esté un nivel arriba
+          # EL CAMBIO: Apuntamos el SWSDK a la carpeta /public dentro del repo de Kyle
+          # para que encuentre "steam/steam_gameserver.h" correctamente.
           python3 ../configure.py \
             --enable-optimize \
             --sdks=l4d2 \
@@ -77,11 +74,11 @@ jobs:
             --sm-path="../../sourcemod" \
             --mms-path="../../mmsource" \
             --hl2sdk-root="../../" \
-            --swsdk-path="../../steamworks-sdk"
+            --swsdk-path="../../steamworks-sdk/public"
 
           ambuild
 
-      - name: 9. Subir archivo .SO
+      - name: 9. Subir archivo .SO final
         uses: actions/upload-artifact@v4
         with:
           name: sourcetvsupport-l4d2-linux-fixed
