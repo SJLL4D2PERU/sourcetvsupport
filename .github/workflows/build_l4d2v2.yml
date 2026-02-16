@@ -1,4 +1,4 @@
-name: Compilar L4D2 (SteamWorks Header Fix)
+name: Compilar L4D2 (SteamWorks SDK Fix)
 
 on: [push, workflow_dispatch]
 
@@ -20,7 +20,8 @@ jobs:
           pip3 install wheel
           pip3 install git+https://github.com/alliedmodders/ambuild
 
-      - name: 3. Descargar Tu Codigo
+      # --- DESCARGAS ---
+      - name: 3. Descargar Tu Codigo (SourceTV Support)
         uses: actions/checkout@v4
         with:
           path: sourcetvsupport
@@ -47,14 +48,23 @@ jobs:
           ref: l4d2
           path: hl2sdk-l4d2
 
-      - name: 7. Descargar SteamWorks SDK (Kyle)
+      - name: 7. Descargar SteamWorks SDK (KyleSanderson)
         uses: actions/checkout@v4
         with:
           repository: KyleSanderson/SteamWorks
           ref: master
-          path: steamworks-sdk
+          path: steamworks-sdk-temp
 
-      - name: 8. Compilar (Fix Include Paths)
+      # PASO CLAVE: Reestructurar SteamWorks para que AMBuild lo reconozca
+      - name: 8. Preparar SteamWorks SDK
+        run: |
+          mkdir -p steamworks-sdk
+          cp -r steamworks-sdk-temp/public/* steamworks-sdk/
+          # El script busca la carpeta 'redistributable_bin', la creamos aunque este vacia
+          mkdir -p steamworks-sdk/redistributable_bin
+
+      # --- COMPILACIÓN ---
+      - name: 9. Compilar
         working-directory: sourcetvsupport
         env:
           SOURCEMOD: ${{ github.workspace }}/sourcemod
@@ -65,8 +75,6 @@ jobs:
           mkdir -p build
           cd build
           
-          # EL CAMBIO: Apuntamos el SWSDK a la carpeta /public dentro del repo de Kyle
-          # para que encuentre "steam/steam_gameserver.h" correctamente.
           python3 ../configure.py \
             --enable-optimize \
             --sdks=l4d2 \
@@ -74,11 +82,11 @@ jobs:
             --sm-path="../../sourcemod" \
             --mms-path="../../mmsource" \
             --hl2sdk-root="../../" \
-            --swsdk-path="../../steamworks-sdk/public"
+            --swsdk-path="../../steamworks-sdk"
 
           ambuild
 
-      - name: 9. Subir archivo .SO final
+      - name: 10. Subir archivo .SO final
         uses: actions/upload-artifact@v4
         with:
           name: sourcetvsupport-l4d2-linux-fixed
