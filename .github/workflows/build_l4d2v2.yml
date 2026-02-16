@@ -1,4 +1,4 @@
-name: Compilar L4D2 Final (Env Vars)
+name: Compilar L4D2 (Nuclear Fix)
 
 on: [push, workflow_dispatch]
 
@@ -13,13 +13,14 @@ jobs:
       - name: 1. Instalar dependencias
         run: |
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip build-essential gcc-multilib g++-multilib clang
+          DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip build-essential gcc-multilib g++-multilib clang tree
 
       - name: 2. Instalar AMBuild
         run: |
           pip3 install wheel
           pip3 install git+https://github.com/alliedmodders/ambuild
 
+      # --- DESCARGAS (CHECKOUTS) ---
       - name: 3. Descargar Tu Codigo
         uses: actions/checkout@v4
         with:
@@ -46,19 +47,29 @@ jobs:
           ref: l4d2
           path: hl2sdk-l4d2
 
-      - name: 7. Compilar (Con Variables de Entorno)
+      # --- COMPILACIÓN ---
+      - name: 7. Compilar (Con Variables Forzadas)
         working-directory: src
+        # AQUÍ ESTÁ EL CAMBIO CLAVE:
+        # Definimos las variables en el entorno del paso, no en el comando.
+        env:
+          HL2SDKL4D2: ${{ github.workspace }}/hl2sdk-l4d2
+          HL2SDK_L4D2: ${{ github.workspace }}/hl2sdk-l4d2
+          MMSOURCE112: ${{ github.workspace }}/mmsource
+          SOURCEMOD112: ${{ github.workspace }}/sourcemod
+          CC: clang
+          CXX: clang++
         run: |
+          # Debug: Mostrar que las carpetas existen realmente
+          echo "Verificando rutas..."
+          ls -ld $HL2SDKL4D2
+          ls -ld $MMSOURCE112
+          
           mkdir -p build
           cd build
           
-          # === LA SOLUCIÓN ===
-          # Definimos manualmente dónde está cada cosa usando variables de entorno.
-          # Esto evita que AMBuild tenga que "adivinar" y fallar.
-          export HL2SDKL4D2="${{ github.workspace }}/hl2sdk-l4d2"
-          export MMSOURCE112="${{ github.workspace }}/mmsource"
-          
-          # Ejecutamos configure.py pasándole también las rutas por si acaso
+          # Ejecutamos configure.py
+          # Ya no le pasamos paths raros, confiamos en las variables ENV de arriba
           python3 ../configure.py \
             --enable-optimize \
             --sdks=l4d2 \
