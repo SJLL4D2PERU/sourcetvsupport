@@ -1,4 +1,4 @@
-name: Compilar L4D2 (SteamWorks Fix)
+name: Compilar L4D2 (SteamWorks Fix V2)
 
 on: [push, workflow_dispatch]
 
@@ -48,11 +48,12 @@ jobs:
           ref: l4d2
           path: hl2sdk-l4d2
 
-      # AQUÍ ESTÁ EL TRUCO: Descargamos un SteamWorks SDK público
-      - name: 7. Descargar SteamWorks SDK (Público)
+      # USAMOS EL REPO DE ALLIEDMODDERS (No requiere token y es estable)
+      - name: 7. Descargar SteamWorks SDK (AlliedModders)
         uses: actions/checkout@v4
         with:
-          repository: RLance/Steamworks-SDK
+          repository: alliedmodders/hl2sdk
+          ref: sdk-2013
           path: steamworks-sdk
 
       # --- COMPILACIÓN ---
@@ -62,13 +63,12 @@ jobs:
           SOURCEMOD: ${{ github.workspace }}/sourcemod
           HL2SDKL4D2: ${{ github.workspace }}/hl2sdk-l4d2
           MMSOURCE112: ${{ github.workspace }}/mmsource
-          # Definimos la variable que el AMBuildScript busca desesperadamente
           SWSDK: ${{ github.workspace }}/steamworks-sdk
         run: |
           mkdir -p build
           cd build
           
-          # Pasamos todas las rutas explícitamente incluyendo el nuevo SDK
+          # Configuramos el build
           python3 ../configure.py \
             --enable-optimize \
             --sdks=l4d2 \
