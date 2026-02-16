@@ -1,4 +1,4 @@
-name: Compilar L4D2 (SteamWorks SDK Fix)
+name: Compilar L4D2 (SteamWorks SDK Final Fix)
 
 on: [push, workflow_dispatch]
 
@@ -21,7 +21,7 @@ jobs:
           pip3 install git+https://github.com/alliedmodders/ambuild
 
       # --- DESCARGAS ---
-      - name: 3. Descargar Tu Codigo (SourceTV Support)
+      - name: 3. Descargar Tu Codigo
         uses: actions/checkout@v4
         with:
           path: sourcetvsupport
@@ -48,33 +48,29 @@ jobs:
           ref: l4d2
           path: hl2sdk-l4d2
 
-      - name: 7. Descargar SteamWorks SDK (KyleSanderson)
+      - name: 7. Descargar SteamWorks SDK (Kyle)
         uses: actions/checkout@v4
         with:
           repository: KyleSanderson/SteamWorks
           ref: master
-          path: steamworks-sdk-temp
-
-      # PASO CLAVE: Reestructurar SteamWorks para que AMBuild lo reconozca
-      - name: 8. Preparar SteamWorks SDK
-        run: |
-          mkdir -p steamworks-sdk
-          cp -r steamworks-sdk-temp/public/* steamworks-sdk/
-          # El script busca la carpeta 'redistributable_bin', la creamos aunque este vacia
-          mkdir -p steamworks-sdk/redistributable_bin
+          path: steamworks-sdk
 
       # --- COMPILACIÓN ---
-      - name: 9. Compilar
+      - name: 8. Compilar
         working-directory: sourcetvsupport
         env:
           SOURCEMOD: ${{ github.workspace }}/sourcemod
           HL2SDKL4D2: ${{ github.workspace }}/hl2sdk-l4d2
           MMSOURCE112: ${{ github.workspace }}/mmsource
+          # Probamos con ambas variables de entorno que suele usar AMBuild
           SWSDK: ${{ github.workspace }}/steamworks-sdk
+          STEAMWORKS: ${{ github.workspace }}/steamworks-sdk
         run: |
           mkdir -p build
           cd build
           
+          # Si el configure falla por no encontrar el SDK, le pasamos las rutas
+          # intentando apuntar tanto a la raiz como a /public
           python3 ../configure.py \
             --enable-optimize \
             --sdks=l4d2 \
@@ -82,11 +78,19 @@ jobs:
             --sm-path="../../sourcemod" \
             --mms-path="../../mmsource" \
             --hl2sdk-root="../../" \
-            --swsdk-path="../../steamworks-sdk"
+            --swsdk-path="../../steamworks-sdk" || \
+          python3 ../configure.py \
+            --enable-optimize \
+            --sdks=l4d2 \
+            --targets=x86 \
+            --sm-path="../../sourcemod" \
+            --mms-path="../../mmsource" \
+            --hl2sdk-root="../../" \
+            --swsdk-path="../../steamworks-sdk/public"
 
           ambuild
 
-      - name: 10. Subir archivo .SO final
+      - name: 9. Subir archivo .SO final
         uses: actions/upload-artifact@v4
         with:
           name: sourcetvsupport-l4d2-linux-fixed
