@@ -1,4 +1,4 @@
-name: Compilar L4D2 (Bypass Git Errors)
+name: Compilar L4D2 (SteamWorks Fix V3)
 
 on: [push, workflow_dispatch]
 
@@ -20,13 +20,13 @@ jobs:
           pip3 install wheel
           pip3 install git+https://github.com/alliedmodders/ambuild
 
-      # --- DESCARGAS LIMPIAS ---
+      # --- DESCARGAS ---
       - name: 3. Descargar Tu Codigo
         uses: actions/checkout@v4
         with:
           path: sourcetvsupport
 
-      - name: 4. Descargar SourceMod (Rama Estable)
+      - name: 4. Descargar SourceMod
         uses: actions/checkout@v4
         with:
           repository: alliedmodders/sourcemod
@@ -48,15 +48,13 @@ jobs:
           ref: l4d2
           path: hl2sdk-l4d2
 
-      # DESCARGA MANUAL DEL STEAMWORKS SDK PARA EVITAR FALLOS DE GIT
-      - name: 7. Descargar SteamWorks SDK (Manual)
-        run: |
-          mkdir -p steamworks-sdk
-          cd steamworks-sdk
-          wget https://github.com/alliedmodders/hl2sdk/archive/refs/heads/sdk-2013.zip -O sdk.zip
-          unzip sdk.zip
-          mv hl2sdk-sdk-2013/* .
-          rm -rf hl2sdk-sdk-2013 sdk.zip
+      # NUEVA FUENTE PARA STEAMWORKS (Repositorio estable de AlliedModders)
+      - name: 7. Descargar SteamWorks SDK (Oficial AM)
+        uses: actions/checkout@v4
+        with:
+          repository: alliedmodders/steamworks-sdk
+          ref: master
+          path: steamworks-sdk
 
       # --- COMPILACIÓN ---
       - name: 8. Compilar
@@ -70,6 +68,7 @@ jobs:
           mkdir -p build
           cd build
           
+          # Configuramos el build apuntando a las carpetas correctas
           python3 ../configure.py \
             --enable-optimize \
             --sdks=l4d2 \
