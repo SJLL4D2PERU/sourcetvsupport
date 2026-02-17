@@ -1,4 +1,4 @@
-name: Compilar L4D2 (Steam Header Fix)
+name: Compilar L4D2 (Final Fix - Auto Search)
 
 on: [push, workflow_dispatch]
 
@@ -20,7 +20,6 @@ jobs:
           pip3 install wheel
           pip3 install git+https://github.com/alliedmodders/ambuild
 
-      # --- DESCARGAS ---
       - name: 3. Descargar Tu Codigo
         uses: actions/checkout@v4
         with:
@@ -55,15 +54,17 @@ jobs:
           ref: master
           path: steamworks-sdk-temp
 
-      # --- FIX DE RUTAS STEAM ---
-      - name: 8. Mover Headers de Steam
+      # PASO INTELIGENTE: Busca la carpeta 'public' o donde estén los headers
+      - name: 8. Localizar y Preparar SteamWorks
         run: |
-          mkdir -p steamworks-sdk/public
-          cp -r steamworks-sdk-temp/public/* steamworks-sdk/public/
-          # También los ponemos en la raíz por si acaso
-          cp -r steamworks-sdk-temp/public/* steamworks-sdk/
+          mkdir -p steamworks-sdk
+          # Buscamos donde está el archivo steam_gameserver.h y copiamos su carpeta padre
+          HEADER_PATH=$(find steamworks-sdk-temp -name "steam_gameserver.h" | head -n 1)
+          # Subimos dos niveles desde el archivo para obtener la estructura que busca el compilador
+          BASE_PATH=$(dirname $(dirname $HEADER_PATH))
+          cp -r $BASE_PATH/* steamworks-sdk/
+          echo "SteamWorks preparado en: steamworks-sdk"
 
-      # --- COMPILACIÓN ---
       - name: 9. Compilar
         working-directory: sourcetvsupport
         env:
@@ -74,7 +75,6 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          
           python3 ../configure.py \
             --enable-optimize \
             --sdks=l4d2 \
@@ -83,7 +83,6 @@ jobs:
             --mms-path="../../mmsource" \
             --hl2sdk-root="../../" \
             --swsdk-path="../../steamworks-sdk"
-
           ambuild
 
       - name: 10. Subir archivo .SO final
