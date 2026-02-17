@@ -1,4 +1,4 @@
-name: Compilar L4D2 (Final Fix - Steam Folder)
+name: Compilar L4D2 (Steam Header Absolute Fix)
 
 on: [push, workflow_dispatch]
 
@@ -54,23 +54,24 @@ jobs:
           ref: master
           path: steamworks-sdk-temp
 
-      # REESTRUCTURACIÓN: El código busca "steam/steam_gameserver.h"
-      # Así que creamos la carpeta 'steam' dentro de nuestro SDK
+      # REESTRUCTURACIÓN: Creamos la carpeta 'steam' y metemos los headers dentro.
       - name: 8. Preparar Estructura Steam
         run: |
           mkdir -p steamworks-sdk/steam
           # Buscamos todos los .h y los metemos en la subcarpeta 'steam'
           find steamworks-sdk-temp -name "*.h" -exec cp {} steamworks-sdk/steam/ \;
-          # También creamos una carpeta 'public' que apunte a la misma raíz por si acaso
+          # Creamos un enlace simbólico de 'public' a la raíz para máxima compatibilidad
           ln -s . steamworks-sdk/public 
 
-      - name: 9. Compilar
+      - name: 9. Compilar con Flags Forzados
         working-directory: sourcetvsupport
         env:
           SOURCEMOD: ${{ github.workspace }}/sourcemod
           HL2SDKL4D2: ${{ github.workspace }}/hl2sdk-l4d2
           MMSOURCE112: ${{ github.workspace }}/mmsource
           SWSDK: ${{ github.workspace }}/steamworks-sdk
+          # Forzamos al compilador a incluir la carpeta donde creamos 'steam/'
+          CPPFLAGS: "-I${{ github.workspace }}/steamworks-sdk"
         run: |
           mkdir -p build
           cd build
