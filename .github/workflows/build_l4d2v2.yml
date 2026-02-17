@@ -1,4 +1,4 @@
-name: Compilar L4D2 (Final Fix - Auto Search)
+name: Compilar L4D2 (Final Fix v4)
 
 on: [push, workflow_dispatch]
 
@@ -54,16 +54,14 @@ jobs:
           ref: master
           path: steamworks-sdk-temp
 
-      # PASO INTELIGENTE: Busca la carpeta 'public' o donde estén los headers
-      - name: 8. Localizar y Preparar SteamWorks
+      # REESTRUCTURACIÓN MANUAL GARANTIZADA
+      - name: 8. Preparar SteamWorks Headers
         run: |
-          mkdir -p steamworks-sdk
-          # Buscamos donde está el archivo steam_gameserver.h y copiamos su carpeta padre
-          HEADER_PATH=$(find steamworks-sdk-temp -name "steam_gameserver.h" | head -n 1)
-          # Subimos dos niveles desde el archivo para obtener la estructura que busca el compilador
-          BASE_PATH=$(dirname $(dirname $HEADER_PATH))
-          cp -r $BASE_PATH/* steamworks-sdk/
-          echo "SteamWorks preparado en: steamworks-sdk"
+          mkdir -p steamworks-sdk/steam
+          # Copiamos los archivos .h directamente a la carpeta 'steam' que es lo que busca el compilador
+          cp steamworks-sdk-temp/Headers/*.h steamworks-sdk/steam/
+          # Creamos un enlace para que el configure.py encuentre la raíz del SDK
+          ln -s . steamworks-sdk/public 
 
       - name: 9. Compilar
         working-directory: sourcetvsupport
