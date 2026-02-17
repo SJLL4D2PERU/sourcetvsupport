@@ -1,4 +1,4 @@
-name: Compilar L4D2 (Final Fix - Debug Path)
+name: Compilar L4D2 (Steamworks SDK Fix Final)
 
 on: [push, workflow_dispatch]
 
@@ -13,7 +13,7 @@ jobs:
       - name: 1. Instalar dependencias
         run: |
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip build-essential gcc-multilib g++-multilib clang
+          DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip build-essential gcc-multilib g++-multilib clang wget unzip
 
       - name: 2. Instalar AMBuild
         run: |
@@ -47,31 +47,25 @@ jobs:
           ref: l4d2
           path: hl2sdk-l4d2
 
-      - name: 7. Descargar SteamWorks SDK (Kyle)
-        uses: actions/checkout@v4
-        with:
-          repository: KyleSanderson/SteamWorks
-          ref: master
-          path: steamworks-sdk-temp
-
-      # === PASO CORREGIDO Y CON DEBUG ===
-      - name: 8. Preparar Estructura de Steam
+      # PASO CLAVE: Descargar los headers reales de Steamworks
+      - name: 7. Descargar Steamworks SDK Headers (Garantizado)
         run: |
-          # Creamos la ruta que pide el compilador
           mkdir -p steamworks-sdk/public/steam
-          
-          echo "--- DEBUG: ¿Que hay en el repo de Kyle? ---"
-          ls -R steamworks-sdk-temp | grep ".h" | head -n 5
-          
-          # Intentamos copiar desde las dos rutas posibles en ese repo
-          cp -v steamworks-sdk-temp/Headers/*.h steamworks-sdk/public/steam/ 2>/dev/null || \
-          cp -v steamworks-sdk-temp/*.h steamworks-sdk/public/steam/ 2>/dev/null || \
-          find steamworks-sdk-temp -name "*.h" -exec cp -v {} steamworks-sdk/public/steam/ \;
+          cd steamworks-sdk/public/steam/
+          # Descargamos los 4-5 archivos esenciales que pide el compilador
+          BASE_URL="https://raw.githubusercontent.com/alliedmodders/hl2sdk/sdk-2013/public/steam"
+          wget $BASE_URL/steam_api.h
+          wget $BASE_URL/steam_gameserver.h
+          wget $BASE_URL/isteamgameserver.h
+          wget $BASE_URL/isteamgameserverstats.h
+          wget $BASE_URL/steamclientpublic.h
+          wget $BASE_URL/steamtypes.h
+          wget $BASE_URL/isteamclient.h
+          wget $BASE_URL/isteamnetworkingsockets.h || true
+          echo "Archivos descargados en steamworks-sdk/public/steam:"
+          ls -l
 
-          echo "--- VERIFICACIÓN FINAL ---"
-          ls -l steamworks-sdk/public/steam/steam_gameserver.h
-
-      - name: 9. Compilar
+      - name: 8. Compilar
         working-directory: sourcetvsupport
         env:
           SOURCEMOD: ${{ github.workspace }}/sourcemod
@@ -93,7 +87,7 @@ jobs:
             
           ambuild
 
-      - name: 10. Subir archivo .SO final
+      - name: 9. Subir archivo .SO final
         uses: actions/upload-artifact@v4
         with:
           name: sourcetvsupport-l4d2-linux-fixed
