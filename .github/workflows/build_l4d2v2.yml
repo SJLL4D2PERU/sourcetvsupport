@@ -1,4 +1,4 @@
-name: Compilar L4D2 (Steamworks SDK Fix Final)
+name: Compilar L4D2 (Steamworks Rlabrecque Fix)
 
 on: [push, workflow_dispatch]
 
@@ -13,7 +13,7 @@ jobs:
       - name: 1. Instalar dependencias
         run: |
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip build-essential gcc-multilib g++-multilib clang wget unzip
+          DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip build-essential gcc-multilib g++-multilib clang
 
       - name: 2. Instalar AMBuild
         run: |
@@ -47,25 +47,22 @@ jobs:
           ref: l4d2
           path: hl2sdk-l4d2
 
-      # PASO CLAVE: Descargar los headers reales de Steamworks
-      - name: 7. Descargar Steamworks SDK Headers (Garantizado)
+      # USAMOS EL REPO QUE ENCONTRASTE
+      - name: 7. Descargar SteamWorks SDK (rlabrecque)
+        uses: actions/checkout@v4
+        with:
+          repository: rlabrecque/SteamworksSDK
+          path: steamworks-sdk-temp
+
+      # REESTRUCTURACIÓN: Copiamos desde sdk/public/steam a nuestra carpeta de build
+      - name: 8. Preparar Estructura Steam
         run: |
           mkdir -p steamworks-sdk/public/steam
-          cd steamworks-sdk/public/steam/
-          # Descargamos los 4-5 archivos esenciales que pide el compilador
-          BASE_URL="https://raw.githubusercontent.com/alliedmodders/hl2sdk/sdk-2013/public/steam"
-          wget $BASE_URL/steam_api.h
-          wget $BASE_URL/steam_gameserver.h
-          wget $BASE_URL/isteamgameserver.h
-          wget $BASE_URL/isteamgameserverstats.h
-          wget $BASE_URL/steamclientpublic.h
-          wget $BASE_URL/steamtypes.h
-          wget $BASE_URL/isteamclient.h
-          wget $BASE_URL/isteamnetworkingsockets.h || true
-          echo "Archivos descargados en steamworks-sdk/public/steam:"
-          ls -l
+          cp -r steamworks-sdk-temp/sdk/public/steam/* steamworks-sdk/public/steam/
+          echo "Contenido verificado en steamworks-sdk/public/steam:"
+          ls steamworks-sdk/public/steam/steam_gameserver.h
 
-      - name: 8. Compilar
+      - name: 9. Compilar
         working-directory: sourcetvsupport
         env:
           SOURCEMOD: ${{ github.workspace }}/sourcemod
@@ -87,7 +84,7 @@ jobs:
             
           ambuild
 
-      - name: 9. Subir archivo .SO final
+      - name: 10. Subir archivo .SO final
         uses: actions/upload-artifact@v4
         with:
           name: sourcetvsupport-l4d2-linux-fixed
