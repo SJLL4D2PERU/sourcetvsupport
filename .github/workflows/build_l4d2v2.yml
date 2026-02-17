@@ -1,4 +1,4 @@
-name: Compilar L4D2 (Final Fix v4)
+name: Compilar L4D2 (Final Fix - Estructura Forzada)
 
 on: [push, workflow_dispatch]
 
@@ -54,14 +54,17 @@ jobs:
           ref: master
           path: steamworks-sdk-temp
 
-      # REESTRUCTURACIÓN MANUAL GARANTIZADA
+      # REESTRUCTURACIÓN AGRESIVA: No importa donde estén, los encontraremos.
       - name: 8. Preparar SteamWorks Headers
         run: |
           mkdir -p steamworks-sdk/steam
-          # Copiamos los archivos .h directamente a la carpeta 'steam' que es lo que busca el compilador
-          cp steamworks-sdk-temp/Headers/*.h steamworks-sdk/steam/
-          # Creamos un enlace para que el configure.py encuentre la raíz del SDK
-          ln -s . steamworks-sdk/public 
+          # Buscamos todos los archivos .h en el repo descargado y los movemos a la carpeta 'steam'
+          find steamworks-sdk-temp -name "*.h" -exec cp {} steamworks-sdk/steam/ \;
+          # Creamos una carpeta public por si el script la busca
+          mkdir -p steamworks-sdk/public/steam
+          cp steamworks-sdk/steam/*.h steamworks-sdk/public/steam/
+          echo "Contenido de steamworks-sdk/steam:"
+          ls steamworks-sdk/steam/
 
       - name: 9. Compilar
         working-directory: sourcetvsupport
@@ -73,6 +76,7 @@ jobs:
         run: |
           mkdir -p build
           cd build
+          # Probamos la ruta base de steamworks-sdk
           python3 ../configure.py \
             --enable-optimize \
             --sdks=l4d2 \
