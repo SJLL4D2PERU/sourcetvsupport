@@ -1,4 +1,4 @@
-name: Compilar L4D2 (Final Fix - Steamworks Structure)
+name: Compilar L4D2 (Final Fix - Debug Path)
 
 on: [push, workflow_dispatch]
 
@@ -54,17 +54,21 @@ jobs:
           ref: master
           path: steamworks-sdk-temp
 
-      # === EL PASO DEFINITIVO ===
-      - name: 8. Forzar Estructura de Steam
+      # === PASO CORREGIDO Y CON DEBUG ===
+      - name: 8. Preparar Estructura de Steam
         run: |
-          # Creamos la ruta completa que AMBuild y Clang esperan
+          # Creamos la ruta que pide el compilador
           mkdir -p steamworks-sdk/public/steam
           
-          # Buscamos todos los archivos .h y los metemos DENTRO de la carpeta steam
-          find steamworks-sdk-temp -name "*.h" -exec cp {} steamworks-sdk/public/steam/ \;
+          echo "--- DEBUG: ¿Que hay en el repo de Kyle? ---"
+          ls -R steamworks-sdk-temp | grep ".h" | head -n 5
           
-          # Verificación para el log (si esto sale bien, compila)
-          echo "Verificando archivo crítico:"
+          # Intentamos copiar desde las dos rutas posibles en ese repo
+          cp -v steamworks-sdk-temp/Headers/*.h steamworks-sdk/public/steam/ 2>/dev/null || \
+          cp -v steamworks-sdk-temp/*.h steamworks-sdk/public/steam/ 2>/dev/null || \
+          find steamworks-sdk-temp -name "*.h" -exec cp -v {} steamworks-sdk/public/steam/ \;
+
+          echo "--- VERIFICACIÓN FINAL ---"
           ls -l steamworks-sdk/public/steam/steam_gameserver.h
 
       - name: 9. Compilar
@@ -78,7 +82,6 @@ jobs:
           mkdir -p build
           cd build
           
-          # Apuntamos a la carpeta base del SDK que acabamos de armar
           python3 ../configure.py \
             --enable-optimize \
             --sdks=l4d2 \
