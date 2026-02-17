@@ -1,4 +1,4 @@
-name: Compilar L4D2 (Steam Header Absolute Fix)
+name: Compilar L4D2 (Final Fix - Steam Headers)
 
 on: [push, workflow_dispatch]
 
@@ -54,27 +54,26 @@ jobs:
           ref: master
           path: steamworks-sdk-temp
 
-      # REESTRUCTURACIÓN: Creamos la carpeta 'steam' y metemos los headers dentro.
-      - name: 8. Preparar Estructura Steam
+      # PASO CLAVE: Crear la carpeta 'steam' y meter los archivos .h
+      - name: 8. Preparar Estructura de Headers
         run: |
           mkdir -p steamworks-sdk/steam
-          # Buscamos todos los .h y los metemos en la subcarpeta 'steam'
+          # Buscamos todos los archivos .h en el SDK descargado y los metemos en 'steam/'
           find steamworks-sdk-temp -name "*.h" -exec cp {} steamworks-sdk/steam/ \;
-          # Creamos un enlace simbólico de 'public' a la raíz para máxima compatibilidad
-          ln -s . steamworks-sdk/public 
+          # Creamos un enlace simbólico 'public' que apunte a la raíz para los scripts de configuración
+          ln -s . steamworks-sdk/public
 
-      - name: 9. Compilar con Flags Forzados
+      - name: 9. Compilar
         working-directory: sourcetvsupport
         env:
           SOURCEMOD: ${{ github.workspace }}/sourcemod
           HL2SDKL4D2: ${{ github.workspace }}/hl2sdk-l4d2
           MMSOURCE112: ${{ github.workspace }}/mmsource
           SWSDK: ${{ github.workspace }}/steamworks-sdk
-          # Forzamos al compilador a incluir la carpeta donde creamos 'steam/'
-          CPPFLAGS: "-I${{ github.workspace }}/steamworks-sdk"
         run: |
           mkdir -p build
           cd build
+          # Pasamos la ruta de steamworks-sdk que ahora tiene la carpeta 'steam/' dentro
           python3 ../configure.py \
             --enable-optimize \
             --sdks=l4d2 \
