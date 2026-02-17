@@ -1,4 +1,4 @@
-name: Compilar L4D2 (Steam Header Absolute Fix)
+name: Compilar L4D2 (Final Fix - Steamworks Structure)
 
 on: [push, workflow_dispatch]
 
@@ -54,27 +54,31 @@ jobs:
           ref: master
           path: steamworks-sdk-temp
 
-      # REESTRUCTURACIÓN: Creamos la carpeta 'steam' y metemos los headers dentro.
-      - name: 8. Preparar Estructura Steam
+      # === EL PASO DEFINITIVO ===
+      - name: 8. Forzar Estructura de Steam
         run: |
-          mkdir -p steamworks-sdk/steam
-          # Buscamos todos los .h y los metemos en la subcarpeta 'steam'
-          find steamworks-sdk-temp -name "*.h" -exec cp {} steamworks-sdk/steam/ \;
-          # Creamos un enlace simbólico de 'public' a la raíz para máxima compatibilidad
-          ln -s . steamworks-sdk/public 
+          # Creamos la ruta completa que AMBuild y Clang esperan
+          mkdir -p steamworks-sdk/public/steam
+          
+          # Buscamos todos los archivos .h y los metemos DENTRO de la carpeta steam
+          find steamworks-sdk-temp -name "*.h" -exec cp {} steamworks-sdk/public/steam/ \;
+          
+          # Verificación para el log (si esto sale bien, compila)
+          echo "Verificando archivo crítico:"
+          ls -l steamworks-sdk/public/steam/steam_gameserver.h
 
-      - name: 9. Compilar con Flags Forzados
+      - name: 9. Compilar
         working-directory: sourcetvsupport
         env:
           SOURCEMOD: ${{ github.workspace }}/sourcemod
           HL2SDKL4D2: ${{ github.workspace }}/hl2sdk-l4d2
           MMSOURCE112: ${{ github.workspace }}/mmsource
           SWSDK: ${{ github.workspace }}/steamworks-sdk
-          # Forzamos al compilador a incluir la carpeta donde creamos 'steam/'
-          CPPFLAGS: "-I${{ github.workspace }}/steamworks-sdk"
         run: |
           mkdir -p build
           cd build
+          
+          # Apuntamos a la carpeta base del SDK que acabamos de armar
           python3 ../configure.py \
             --enable-optimize \
             --sdks=l4d2 \
@@ -83,6 +87,7 @@ jobs:
             --mms-path="../../mmsource" \
             --hl2sdk-root="../../" \
             --swsdk-path="../../steamworks-sdk"
+            
           ambuild
 
       - name: 10. Subir archivo .SO final
