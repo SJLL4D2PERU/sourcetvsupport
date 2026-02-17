@@ -1,4 +1,4 @@
-name: Compilar L4D2 (Steamworks Rlabrecque Fix)
+name: Compilar L4D2 (Steamworks SDK Smart Fix)
 
 on: [push, workflow_dispatch]
 
@@ -47,20 +47,30 @@ jobs:
           ref: l4d2
           path: hl2sdk-l4d2
 
-      # USAMOS EL REPO QUE ENCONTRASTE
       - name: 7. Descargar SteamWorks SDK (rlabrecque)
         uses: actions/checkout@v4
         with:
           repository: rlabrecque/SteamworksSDK
           path: steamworks-sdk-temp
 
-      # REESTRUCTURACIÓN: Copiamos desde sdk/public/steam a nuestra carpeta de build
-      - name: 8. Preparar Estructura Steam
+      # === EL PASO INTELIGENTE ===
+      - name: 8. Localizar y Preparar Estructura Steam
         run: |
           mkdir -p steamworks-sdk/public/steam
-          cp -r steamworks-sdk-temp/sdk/public/steam/* steamworks-sdk/public/steam/
-          echo "Contenido verificado en steamworks-sdk/public/steam:"
-          ls steamworks-sdk/public/steam/steam_gameserver.h
+          
+          # Buscamos donde demonios esta el archivo steam_gameserver.h
+          FOUND_FILE=$(find steamworks-sdk-temp -name "steam_gameserver.h" -print -quit)
+          
+          if [ -n "$FOUND_FILE" ]; then
+            SOURCE_DIR=$(dirname "$FOUND_FILE")
+            echo "--- Archivos encontrados en: $SOURCE_DIR ---"
+            cp -r "$SOURCE_DIR"/* steamworks-sdk/public/steam/
+            echo "Verificación: $(ls steamworks-sdk/public/steam/steam_gameserver.h)"
+          else
+            echo "ERROR: No se encontró el SDK de Steamworks en ninguna carpeta."
+            ls -R steamworks-sdk-temp
+            exit 1
+          fi
 
       - name: 9. Compilar
         working-directory: sourcetvsupport
