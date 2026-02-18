@@ -2,7 +2,7 @@
 #include <icvar.h>
 #include <convar.h>
 
-// Macro para contar elementos si no está definida
+// Macro para contar elementos de la lista
 #ifndef NELEMS
 #define NELEMS(x) (sizeof(x) / sizeof(x[0]))
 #endif
@@ -20,7 +20,7 @@ bool VSPPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameS
 		return false;
 	}
 
-	// 2. Lista de comandos a desbloquear para L4D2 Fenix
+	// 2. Lista de comandos para L4D2 Fenix
 	static const char* const cvars[] = {
 		"tv_enable",
 		"tv_maxclients",
@@ -40,18 +40,16 @@ bool VSPPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameS
 		
 		if (pCvar) {
 			handled++;
-			// En L4D2 manipulamos los flags directamente usando bitwise AND/OR
-			// Quitamos FCVAR_DEVELOPMENTONLY (para que funcionen) 
-			// y FCVAR_HIDDEN (para que se vean en consola)
-			pCvar->m_nFlags &= ~(FCVAR_DEVELOPMENTONLY | FCVAR_HIDDEN);
+			// SOLUCIÓN AL ERROR: Usamos el método público 'RemoveFlags'
+			// en lugar de intentar acceder a la variable privada m_nFlags
+			pCvar->RemoveFlags(FCVAR_DEVELOPMENTONLY | FCVAR_HIDDEN);
 		}
 	}
 
 	printf(PLUGIN_LOG_PREFIX "SourceTV Unlocker: %u cvars successfully exposed.\n", (unsigned int)handled);
 
-	// Devolvemos true para que el plugin se mantenga cargado y estable
+	// Devolvemos true para que el plugin se mantenga cargado
 	return true;
 }
 
-// NOTA: No añadimos Unload, Pause ni las demás funciones aquí 
-// porque ya están definidas en plugin_vsp.h
+// No añadimos las funciones Unload/Pause aquí porque ya están en el .h
