@@ -28,11 +28,9 @@ int CBasePlayer::sendprop_m_fFlags = 0;
 int CBaseServer::offset_stringTableCRC = 0;
 
 // =========================================================================
-// VARIABLES NECESARIAS PARA QUE EL LINKER NO FALLE (WRAPPERS.CPP)
-// Se mantienen declaradas e inicializadas en 0/NULL para compatibilidad,
-// pero no se usarán en la lógica "Lite" para evitar crashes.
+// VARIABLES DE COMPATIBILIDAD (DUMMY)
+// Necesarias para que wrappers.cpp compile sin errores de símbolos.
 // =========================================================================
-
 void* pfn_DataTable_WriteSendTablesBuffer = NULL;
 void* pfn_SteamGameServer_GetHSteamPipe = NULL;
 void* pfn_SteamGameServer_GetHSteamUser = NULL;
@@ -40,7 +38,6 @@ void* pfn_SteamInternal_CreateInterface = NULL;
 void* pfn_SteamInternal_GameServer_Init = NULL;
 void* pfn_OpenSocketInternal = NULL;
 
-// Offsets y variables de clases
 int CBaseServer::vtblindex_GetChallengeNr = 0;
 int CBaseServer::vtblindex_GetChallengeType = 0;
 int CBaseServer::vtblindex_ReplyChallenge = 0;
@@ -59,7 +56,6 @@ int CBaseClient::offset_m_SteamID = 0;
 int CFrameSnapshotManager::offset_m_PackedEntitiesPool = 0;
 int HitAnnouncement::pzMsgId = 0;
 
-// Punteros de Detour y Wrappers (Inicializados nulos)
 void* CBaseServer::pfn_IsExclusiveToLobbyConnections = NULL;
 CDetour* CBaseServer::detour_IsExclusiveToLobbyConnections = NULL;
 ICallWrapper* CBaseServer::vcall_GetChallengeNr = NULL;
@@ -83,20 +79,16 @@ int shookid_CHLTVDemoRecorder_RecordServerClasses = 0;
 int shookid_SteamGameServer_LogOff = 0;
 int shookid_CServerGameEnts_CheckTransmit = 0;
 
-// =========================================================================
-// FIN DE VARIABLES DE COMPATIBILIDAD
-// =========================================================================
-
 // SourceHook
 SH_DECL_HOOK1_void(IHLTVDirector, SetHLTVServer, SH_NOATTRIB, 0, IHLTVServer*);
 
-// Detours
 #include <CDetour/detours.h>
 
 SMExtension g_Extension;
 SMEXT_LINK(&g_Extension);
 
-// SMExtension
+// --- Funciones de la Clase SMExtension ---
+
 void SMExtension::Load()
 {
 	if ((g_pGameIServer = sdktools->GetIServer()) == NULL) {
@@ -104,65 +96,45 @@ void SMExtension::Load()
 		return;
 	}
 
-	// NOTA: No activamos ningún Detour aquí para evitar el crash 'realloc'.
-	// Solo hookeamos el director para saber cuándo aplicar el fix del CRC.
-
 	SH_ADD_HOOK(IHLTVDirector, SetHLTVServer, hltvdirector, SH_MEMBER(this, &SMExtension::Handler_CHLTVDirector_SetHLTVServer), true);
 
-	// Intentamos aplicar el fix inmediatamente si el SourceTV ya está activo
 	OnSetHLTVServer(hltvdirector->GetHLTVServer());
 	
-	// Registramos la librería para que otros plugins sepan que estamos aquí
 	sharesys->RegisterLibrary(myself, "sourcetvsupport");
 }
 
 void SMExtension::Unload()
 {
-	// Limpieza básica
 	SH_REMOVE_HOOK(IHLTVDirector, SetHLTVServer, hltvdirector, SH_MEMBER(this, &SMExtension::Handler_CHLTVDirector_SetHLTVServer), true);
 	OnSetHLTVServer(NULL);
 }
 
 bool SMExtension::SetupFromGameConfig(IGameConfig* gc, char* error, int maxlength)
 {
-	// Para la versión Lite, SOLO necesitamos el offset del CRC.
-	// Ignoramos el resto para no fallar si el gamedata es antiguo.
 	if (!gc->GetOffset("CBaseServer::stringTableCRC", &CBaseServer::offset_stringTableCRC)) {
 		ke::SafeSprintf(error, maxlength, "Unable to get offset for \"CBaseServer::stringTableCRC\"");
 		return false;
 	}
-
 	return true;
 }
 
 bool SMExtension::CreateDetours(char* error, size_t maxlength)
 {
-	// Versión Lite: Retornamos true pero NO creamos ningún detour.
-	// Esto evita tocar la gestión de memoria que causa el crash.
-	return true;
+	return true; // No creamos detours para evitar el crash de memoria
 }
 
 void SMExtension::OnSetHLTVServer(IHLTVServer* pIHLTVServer)
 {
 	g_pHLTVServer = pIHLTVServer;
-
-	if (pIHLTVServer == NULL) {
-		return;
-	}
+	if (pIHLTVServer == NULL) return;
 
 	CBaseServer* pServer = CBaseServer::FromIHLTVServer(pIHLTVServer);
-	if (pServer == NULL) {
-		return;
-	}
+	if (pServer == NULL) return;
 
-	// =========================================================================
-	// EL ARREGLO PRINCIPAL (THE FIX)
-	// =========================================================================
-	// Copiamos el CRC (checksum) del mapa desde el servidor principal al SourceTV.
-	// Esto elimina el error "Map differs / String table differs" al reproducir demos.
+	// EL FIX: Copiamos el CRC del mapa para evitar el error "String table differs"
 	pServer->stringTableCRC() = CBaseServer::FromIServer(g_pGameIServer)->stringTableCRC();
 	
-	smutils->LogMessage(myself, "SourceTV Lite: StringTableCRC fix applied successfully.");
+	smutils->LogMessage(myself, "SourceTV Lite: StringTableCRC patched.");
 }
 
 void SMExtension::Handler_CHLTVDirector_SetHLTVServer(IHLTVServer* pIHLTVServer)
@@ -173,10 +145,7 @@ void SMExtension::Handler_CHLTVDirector_SetHLTVServer(IHLTVServer* pIHLTVServer)
 bool SMExtension::SDK_OnLoad(char* error, size_t maxlength, bool late)
 {
 	IGameConfig* gc = NULL;
-	if (!gameconfs->LoadGameConfigFile(GAMEDATA_FILE, &gc, error, maxlength)) {
-		ke::SafeStrcpy(error, maxlength, "Unable to load a gamedata file \"" GAMEDATA_FILE ".txt\"");
-		return false;
-	}
+	if (!gameconfs->LoadGameConfigFile(GAMEDATA_FILE, &gc, error, maxlength)) return false;
 
 	if (!SetupFromGameConfig(gc, error, maxlength)) {
 		gameconfs->CloseGameConfigFile(gc);
@@ -184,7 +153,6 @@ bool SMExtension::SDK_OnLoad(char* error, size_t maxlength, bool late)
 	}
 
 	gameconfs->CloseGameConfigFile(gc);
-	
 	sharesys->AddDependency(myself, "sdktools.ext", true, true);
 	sharesys->AddDependency(myself, "bintools.ext", true, true); 
 
@@ -200,25 +168,33 @@ void SMExtension::SDK_OnAllLoaded()
 {
 	SM_GET_LATE_IFACE(SDKTOOLS, sdktools);
 	SM_GET_LATE_IFACE(BINTOOLS, bintools);
-
-	if (sdktools != NULL) {
-		Load();
-	}
+	if (sdktools != NULL) Load();
 }
 
 bool SMExtension::SDK_OnMetamodLoad(ISmmAPI* ismm, char* error, size_t maxlen, bool late)
 {
-	// Obtenemos interfaces básicas necesarias
 	GET_V_IFACE_CURRENT(GetEngineFactory, networkStringTableContainerServer, INetworkStringTableContainer, INTERFACENAME_NETWORKSTRINGTABLESERVER);
 	GET_V_IFACE_CURRENT(GetServerFactory, hltvdirector, IHLTVDirector, INTERFACEVERSION_HLTVDIRECTOR);
-	
-	// Mantenemos estas por compatibilidad, aunque no se usen intensivamente en la versión Lite
 	GET_V_IFACE_CURRENT(GetServerFactory, playerinfomanager, IPlayerInfoManager, INTERFACEVERSION_PLAYERINFOMANAGER);
 	GET_V_IFACE_CURRENT(GetServerFactory, gameents, IServerGameEnts, INTERFACEVERSION_SERVERGAMEENTS);
 
 	gpGlobals = ismm->GetCGlobals();
-
 	return true;
+}
+
+// CORRECCIÓN: Implementación de las funciones de Interfaz que faltaban
+bool SMExtension::QueryInterfaceDrop(SMInterface* pInterface)
+{
+	if (bintools == pInterface) return false;
+	if (sdktools == pInterface) return g_pGameIServer != NULL;
+	return IExtensionInterface::QueryInterfaceDrop(pInterface);
+}
+
+void SMExtension::NotifyInterfaceDrop(SMInterface* pInterface)
+{
+	if (bintools == pInterface || (sdktools == pInterface && g_pGameIServer == NULL)) {
+		SDK_OnUnload();
+	}
 }
 
 bool SMExtension::QueryRunning(char* error, size_t maxlength)
