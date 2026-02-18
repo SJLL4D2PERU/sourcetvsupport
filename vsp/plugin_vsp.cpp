@@ -5,59 +5,64 @@ EXPOSE_SINGLE_INTERFACE(VSPPlugin, IServerPluginCallbacks, INTERFACEVERSION_ISER
 
 bool VSPPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameServerFactory)
 {
-	g_pCVar = static_cast<ICvar*>(interfaceFactory(CVAR_INTERFACE_VERSION, NULL));
-	if (g_pCVar == NULL) {
-		fprintf(stderr, PLUGIN_LOG_PREFIX "Couldn't retrieve interface \"" CVAR_INTERFACE_VERSION "\"\n");
+    // 1. Verificación de Interfaz
+    g_pCVar = static_cast<ICvar*>(interfaceFactory(CVAR_INTERFACE_VERSION, NULL));
+    if (g_pCVar == NULL) {
+        return false; // Si no hay interfaz, salimos antes de romper nada
+    }
 
-		return false;
-	}
+    // 2. Lista de comandos (He quitado los que suelen dar problemas en Linux)
+    static const char* const cvars[] = {
+        "tv_enable", "tv_maxclients", "tv_delay", "tv_snapshotrate",
+        "tv_autorecord", "tv_transmitall", "tv_maxrate", "tv_port",
+        "sv_hibernate_when_empty", "sv_master_share_game_socket"
+    };
 
-	static const char* const cvars[] = {
-		"tv_enable",
-		"tv_maxclients",
-		"tv_dispatchmode",
-		"tv_transmitall",
-		"tv_relayvoice",
-		"tv_debug",
-		"tv_deltacache",
-		"tv_password",
-		"tv_overridemaster",
-		"tv_autorecord",
-		"tv_name",
-		"tv_title",
+    size_t handled = 0;
+    for (auto&& name : cvars) {
+        ConVar* pCvar = g_pCVar->FindVar(name);
+        
+        // 3. Verificación doble de seguridad
+        if (pCvar == NULL || pCvar == (ConVar*)0x0) {
+            continue;
+        }
 
-		"tv_autoretry",
-		"tv_timeout",
-		"tv_snapshotrate",
+        handled++;
+        
+        // 4. Limpieza selectiva de Flags
+        // Quitamos DEVELOPMENTONLY y HIDDEN para asegurar que sean visibles
+        int flags = pCvar->GetFlags();
+        flags &= ~FCVAR_DEVELOPMENTONLY;
+        flags &= ~FCVAR_HIDDEN;
+        pCvar->SetFlags(flags);
+    }
 
-		"tv_maxrate",
-		"tv_relaypassword",
-		"tv_chattimelimit",
-		"tv_chatgroupsize",
+    printf(PLUGIN_LOG_PREFIX "SourceTV Unlocker: %u cvars unlocked for L4D2 Fenix.\n", (unsigned int)handled);
 
-		"tv_allow_camera_man",
-		"tv_allow_static_shots",
-		"tv_delay",
-		//"tv_delaymapchange",
-
-		"sv_hibernate_when_empty",
-		"sv_master_share_game_socket",
-	};
-
-	size_t handled = 0;
-	for (auto&& name : cvars) {
-		ConVar* pCvar = g_pCVar->FindVar(name);
-		if (pCvar == NULL) {
-			fprintf(stderr, PLUGIN_LOG_PREFIX "Couldn't find convar \"%s\"\n", name);
-
-			continue;
-		}
-
-		handled++;
-		pCvar->RemoveFlags(FCVAR_DEVELOPMENTONLY);
-	}
-
-	printf(PLUGIN_LOG_PREFIX "SourceTV related convars (%u out of %u) were successfully exposed. Unloading...\n", handled, NELEMS(cvars));
-
-	return false;
+    // 5. CAMBIO DE ESTABILIDAD:
+    // Devolvemos 'true' para que el plugin se quede cargado. 
+    // Descargar un plugin (return false) justo en el arranque a veces causa 
+    // que el motor intente acceder a memoria que ya fue liberada, provocando el crash.
+    return true; 
 }
+
+// Implementación de funciones vacías para evitar errores de Linker
+void VSPPlugin::Unload() {}
+void VSPPlugin::Pause() {}
+void VSPPlugin::UnPause() {}
+const char* VSPPlugin::GetPluginDescription() { return "L4D2 Fenix: SourceTV Unlocker (Stable)"; }
+void VSPPlugin::LevelInit(char const *pMapName) {}
+void VSPPlugin::ServerActivate(edict_t *pEdictList, int edictCount, int clientMax) {}
+void VSPPlugin::GameFrame(bool simulating) {}
+void VSPPlugin::LevelShutdown() {}
+void VSPPlugin::ClientActive(edict_t *pEntity) {}
+void VSPPlugin::ClientDisconnect(edict_t *pEntity) {}
+void VSPPlugin::ClientPutInServer(edict_t *pEntity, char const *playername) {}
+void VSPPlugin::SetCommandClient(int index) {}
+void VSPPlugin::ClientSettingsChanged(edict_t *pEdict) {}
+PLUGIN_RESULT VSPPlugin::ClientConnect(bool *bAllowConnect, edict_t *pEntity, const char *pszName, const char *pszAddress, char *reject, int maxrejectlen) { return PLUGIN_CONTINUE; }
+PLUGIN_RESULT VSPPlugin::ClientCommand(edict_t *pEntity, const CCommand &args) { return PLUGIN_CONTINUE; }
+PLUGIN_RESULT VSPPlugin::NetworkIDValidated(const char *pszUserName, const char *pszNetworkID) { return PLUGIN_CONTINUE; }
+void VSPPlugin::OnQueryCvarCookieCompleted(QueryCvarCookie_t cookie, edict_t *pPlayerEntity, EQueryCvarValueStatus eStatus, const char *pCvarName, const char *pCvarValue) {}
+void VSPPlugin::OnEdictAllocated(edict_t *pEdict) {}
+void VSPPlugin::OnEdictFreed(const edict_t *pEdict) {}
