@@ -1,24 +1,22 @@
-name: Compilar L4D2 (Steamworks SDK Smart Fix)
+name: Compilar L4D2 Windows (Steamworks SDK Smart Fix)
 
 on: [push, workflow_dispatch]
 
 jobs:
   build:
-    name: Compilar Ubuntu 20.04
-    runs-on: ubuntu-latest
-    container:
-      image: ubuntu:20.04
+    name: Compilar Windows-latest
+    runs-on: windows-latest
 
     steps:
-      - name: 1. Instalar dependencias
-        run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y git python3 python3-pip build-essential gcc-multilib g++-multilib clang
+      - name: 1. Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
       - name: 2. Instalar AMBuild
         run: |
-          pip3 install wheel
-          pip3 install git+https://github.com/alliedmodders/ambuild
+          python -m pip install wheel
+          python -m pip install git+https://github.com/alliedmodders/ambuild
 
       - name: 3. Descargar Tu Codigo
         uses: actions/checkout@v4
@@ -47,55 +45,42 @@ jobs:
           ref: l4d2
           path: hl2sdk-l4d2
 
-      - name: 7. Descargar SteamWorks SDK (rlabrecque)
+      - name: 7. Descargar SteamWorks SDK
         uses: actions/checkout@v4
         with:
           repository: rlabrecque/SteamworksSDK
           path: steamworks-sdk-temp
 
-      # === EL PASO INTELIGENTE ===
-      - name: 8. Localizar y Preparar Estructura Steam
+      - name: 8. Preparar Estructura Steam (Windows PowerShell)
+        shell: powershell
         run: |
-          mkdir -p steamworks-sdk/public/steam
-          
-          # Buscamos donde demonios esta el archivo steam_gameserver.h
-          FOUND_FILE=$(find steamworks-sdk-temp -name "steam_gameserver.h" -print -quit)
-          
-          if [ -n "$FOUND_FILE" ]; then
-            SOURCE_DIR=$(dirname "$FOUND_FILE")
-            echo "--- Archivos encontrados en: $SOURCE_DIR ---"
-            cp -r "$SOURCE_DIR"/* steamworks-sdk/public/steam/
-            echo "Verificación: $(ls steamworks-sdk/public/steam/steam_gameserver.h)"
-          else
-            echo "ERROR: No se encontró el SDK de Steamworks en ninguna carpeta."
-            ls -R steamworks-sdk-temp
-            exit 1
-          fi
+          New-Item -ItemType Directory -Force -Path "steamworks-sdk\public\steam"
+          $headerFile = Get-ChildItem -Path "steamworks-sdk-temp" -Filter "steam_gameserver.h" -Recurse | Select-Object -First 1
+          if ($headerFile) {
+              $sourceDir = $headerFile.DirectoryName
+              Copy-Item -Path "$sourceDir\*" -Destination "steamworks-sdk\public\steam\" -Recurse -Force
+              Write-Host "Archivos copiados desde: $sourceDir"
+          } else {
+              Write-Error "No se encontró el SDK de Steamworks"
+              exit 1
+          }
 
-      - name: 9. Compilar
+      - name: 9. Compilar con MSVC
+        shell: cmd
         working-directory: sourcetvsupport
         env:
-          SOURCEMOD: ${{ github.workspace }}/sourcemod
-          HL2SDKL4D2: ${{ github.workspace }}/hl2sdk-l4d2
-          MMSOURCE112: ${{ github.workspace }}/mmsource
-          SWSDK: ${{ github.workspace }}/steamworks-sdk
+          SOURCEMOD: ${{ github.workspace }}\sourcemod
+          HL2SDKL4D2: ${{ github.workspace }}\hl2sdk-l4d2
+          MMSOURCE112: ${{ github.workspace }}\mmsource
+          SWSDK: ${{ github.workspace }}\steamworks-sdk
         run: |
-          mkdir -p build
+          mkdir build
           cd build
-          
-          python3 ../configure.py \
-            --enable-optimize \
-            --sdks=l4d2 \
-            --targets=x86 \
-            --sm-path="../../sourcemod" \
-            --mms-path="../../mmsource" \
-            --hl2sdk-root="../../" \
-            --swsdk-path="../../steamworks-sdk"
-            
+          python ..\configure.py --enable-optimize --sdks=l4d2 --targets=x86 --sm-path="..\..\sourcemod" --mms-path="..\..\mmsource" --hl2sdk-root="..\..\" --swsdk-path="..\..\steamworks-sdk"
           ambuild
 
-      - name: 10. Subir archivo .SO final
+      - name: 10. Subir archivo .DLL final
         uses: actions/upload-artifact@v4
         with:
-          name: sourcetvsupport-l4d2-linux-fixed
-          path: sourcetvsupport/build/package/**/*.so
+          name: sourcetvsupport-l4d2-windows-fixed
+          path: sourcetvsupport/build/package/**/*.dll
