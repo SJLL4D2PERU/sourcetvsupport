@@ -1,14 +1,14 @@
-name: Compilar L4D2 Windows (Steamworks SDK Smart Fix)
+name: Compilar L4D2 Windows (Fenix Fixed)
 
 on: [push, workflow_dispatch]
 
 jobs:
   build:
-    name: Compilar Windows-latest
+    name: Compilar Extension Windows
     runs-on: windows-latest
 
     steps:
-      - name: 1. Configurar Python
+      - name: 1. Configurar Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -21,37 +21,16 @@ jobs:
       - name: 3. Descargar Tu Codigo
         uses: actions/checkout@v4
         with:
-          path: sourcetvsupport
+          path: extension # Lo ponemos en una carpeta clara
 
-      - name: 4. Descargar SourceMod
-        uses: actions/checkout@v4
-        with:
-          repository: alliedmodders/sourcemod
-          ref: master
-          path: sourcemod
-          submodules: true
+      - name: 4. Descargar Dependencias (SM, MM, SDK)
+        run: |
+          git clone --recursive https://github.com/alliedmodders/sourcemod sourcemod
+          git clone --recursive https://github.com/alliedmodders/metamod-source mmsource
+          git clone --recursive https://github.com/alliedmodders/hl2sdk -b l4d2 hl2sdk-l4d2
+          git clone --recursive https://github.com/rlabrecque/SteamworksSDK steamworks-sdk-temp
 
-      - name: 5. Descargar MetaMod
-        uses: actions/checkout@v4
-        with:
-          repository: alliedmodders/metamod-source
-          ref: master
-          path: mmsource
-
-      - name: 6. Descargar HL2SDK (L4D2)
-        uses: actions/checkout@v4
-        with:
-          repository: alliedmodders/hl2sdk
-          ref: l4d2
-          path: hl2sdk-l4d2
-
-      - name: 7. Descargar SteamWorks SDK
-        uses: actions/checkout@v4
-        with:
-          repository: rlabrecque/SteamworksSDK
-          path: steamworks-sdk-temp
-
-      - name: 8. Preparar Estructura Steam (Windows PowerShell)
+      - name: 5. Preparar Estructura Steamworks (Smart Fix)
         shell: powershell
         run: |
           New-Item -ItemType Directory -Force -Path "steamworks-sdk\public\steam"
@@ -59,37 +38,44 @@ jobs:
           if ($headerFile) {
               $sourceDir = $headerFile.DirectoryName
               Copy-Item -Path "$sourceDir\*" -Destination "steamworks-sdk\public\steam\" -Recurse -Force
-              Write-Host "Archivos copiados desde: $sourceDir"
-          } else {
-              Write-Error "No se encontró el SDK de Steamworks"
-              exit 1
+              Write-Host "Steamworks preparado."
           }
 
-      - name: 9. Parche Automático de configure.py (Evita error de Python)
+      - name: 6. Parche Automático de configure.py
         shell: powershell
         run: |
-          $path = "sourcetvsupport/configure.py"
+          $path = "extension/configure.py"
           if (Test-Path $path) {
             (Get-Content $path) -replace '%default', '%(default)s' | Set-Content $path
-            Write-Host "Archivo configure.py parcheado automáticamente."
+            Write-Host "configure.py parcheado."
           }
 
-      - name: 10. Compilar con MSVC
+      - name: 7. Configurar y Compilar (Rutas Absolutas)
         shell: cmd
-        working-directory: sourcetvsupport
+        working-directory: extension
         env:
-          SOURCEMOD: ${{ github.workspace }}\sourcemod
+          # Forzamos las variables de entorno para que AMBuild las vea sí o sí
           HL2SDKL4D2: ${{ github.workspace }}\hl2sdk-l4d2
+          SOURCEMOD: ${{ github.workspace }}\sourcemod
           MMSOURCE112: ${{ github.workspace }}\mmsource
           SWSDK: ${{ github.workspace }}\steamworks-sdk
         run: |
-          if not exist build mkdir build
+          mkdir build
           cd build
-          python ..\configure.py --enable-optimize --sdks=l4d2 --targets=x86 --sm-path="..\..\sourcemod" --mms-path="..\..\mmsource" --hl2sdk-root="..\..\" --swsdk-path="..\..\steamworks-sdk"
+          :: Usamos rutas absolutas con el workspace de GitHub
+          python ..\configure.py --enable-optimize ^
+            --sdks=l4d2 ^
+            --targets=x86 ^
+            --sm-path="${{ github.workspace }}\sourcemod" ^
+            --mms-path="${{ github.workspace }}\mmsource" ^
+            --hl2sdk-root="${{ github.workspace }}" ^
+            --swsdk-path="${{ github.workspace }}\steamworks-sdk"
+          
+          if %errorlevel% neq 0 exit /b %errorlevel%
           ambuild
 
-      - name: 11. Subir archivo .DLL final
+      - name: 8. Subir archivo .DLL final
         uses: actions/upload-artifact@v4
         with:
-          name: sourcetvsupport-l4d2-windows-fixed
-          path: sourcetvsupport/build/package/**/*.dll
+          name: sourcetvsupport-windows
+          path: extension/build/package/**/*.dll
