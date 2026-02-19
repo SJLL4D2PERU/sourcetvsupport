@@ -11,7 +11,7 @@ jobs:
       - name: 1. Configurar Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.11'
 
       - name: 2. Instalar AMBuild
         run: |
@@ -65,7 +65,16 @@ jobs:
               exit 1
           }
 
-      - name: 9. Compilar con MSVC
+      - name: 9. Parche Automático de configure.py (Evita error de Python)
+        shell: powershell
+        run: |
+          $path = "sourcetvsupport/configure.py"
+          if (Test-Path $path) {
+            (Get-Content $path) -replace '%default', '%(default)s' | Set-Content $path
+            Write-Host "Archivo configure.py parcheado automáticamente."
+          }
+
+      - name: 10. Compilar con MSVC
         shell: cmd
         working-directory: sourcetvsupport
         env:
@@ -74,12 +83,12 @@ jobs:
           MMSOURCE112: ${{ github.workspace }}\mmsource
           SWSDK: ${{ github.workspace }}\steamworks-sdk
         run: |
-          mkdir build
+          if not exist build mkdir build
           cd build
           python ..\configure.py --enable-optimize --sdks=l4d2 --targets=x86 --sm-path="..\..\sourcemod" --mms-path="..\..\mmsource" --hl2sdk-root="..\..\" --swsdk-path="..\..\steamworks-sdk"
           ambuild
 
-      - name: 10. Subir archivo .DLL final
+      - name: 11. Subir archivo .DLL final
         uses: actions/upload-artifact@v4
         with:
           name: sourcetvsupport-l4d2-windows-fixed
